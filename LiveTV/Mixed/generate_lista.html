@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Generador de lista.m3u</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --card: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #22c55e;
+      --accent-dark: #16a34a;
+      --border: #374151;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(135deg, #020817, var(--bg));
+      color: var(--text);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .card {
+      width: min(700px, 100%);
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 28px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(1.8rem, 4vw, 2.4rem);
+    }
+
+    p {
+      margin: 0 0 20px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 14px 22px;
+      font-size: 1rem;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+    button:disabled {
+      cursor: wait;
+      opacity: 0.7;
+    }
+
+    .status {
+      margin-top: 18px;
+      min-height: 24px;
+      color: #bfdbfe;
+      font-weight: 600;
+    }
+
+    .tiny {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Generar lista.m3u</h1>
+    <p>Descarga el archivo JSON de canales y lo convierte automáticamente en un archivo IPTV compatible con <strong>lista.m3u</strong>.</p>
+
+    <div class="button-row">
+      <button id="generateBtn">Generar lista.m3u</button>
+    </div>
+
+    <div id="status" class="status">Esperando...</div>
+    <div class="tiny">Origen: <code>LiveTV/Mixed/LiveTV.json</code></div>
+  </div>
+
+  <script>
+    const generateBtn = document.getElementById('generateBtn');
+    const statusEl = document.getElementById('status');
+
+    function showStatus(msg, isError = false) {
+      statusEl.textContent = msg;
+      statusEl.style.color = isError ? '#fca5a5' : '#bfdbfe';
+    }
+
+    async function generateListaM3U() {
+      generateBtn.disabled = true;
+      showStatus('Leyendo LiveTV.json...');
+
+      try {
+        const response = await fetch('LiveTV.json', { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error(`No se pudo cargar LiveTV.json (${response.status})`);
+        }
+
+        const data = await response.json();
+        const channels = data?.channels ?? {};
+        const lines = ['#EXTM3U'];
+
+        let total = 0;
+
+        for (const [group, items] of Object.entries(channels)) {
+          for (const channel of items || []) {
+            const name = channel?.name || 'Unnamed Channel';
+            const logo = channel?.logo || '';
+            const url = channel?.url;
+
+            if (!url) continue;
+
+            lines.push(`#EXTINF:-1 tvg-logo="${logo}" group-title="${group}",${name}`);
+            lines.push(url);
+            total += 1;
+          }
+        }
+
+        const content = lines.join('\n') + '\n';
+        const blob = new Blob([content], { type: 'application/vnd.apple.mpegurl;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'lista.m3u';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+
+        showStatus(`¡Listo! Se generó lista.m3u con ${total} canales.`);
+      } catch (error) {
+        console.error(error);
+        showStatus(`Error: ${error.message}`, true);
+      } finally {
+        generateBtn.disabled = false;
+      }
+    }
+
+    generateBtn.addEventListener('click', generateListaM3U);
+  </script>
+</body>
+</html>
