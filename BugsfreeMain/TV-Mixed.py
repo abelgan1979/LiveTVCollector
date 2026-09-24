@@ -206,6 +206,45 @@ class M3UCollector:
         logging.info(f"Exported M3U to {filepath}")
         return filepath
 
+    def export_json(self, filename="LiveTV.json"):
+        filepath = os.path.join(self.output_dir, filename)
+        mumbai_tz = pytz.timezone('Asia/Kolkata')
+        current_time = datetime.now(mumbai_tz).strftime('%Y-%m-%d %H:%M:%S')
+        
+        json_data = {
+            "date": current_time,
+            "channels": dict(self.channels)
+        }
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(json_data, f, ensure_ascii=False, indent=2)
+        logging.info(f"Exported JSON to {filepath}")
+        return filepath
+
+    def export_m3u_from_json(self, json_filename="LiveTV.json", output_filename="lista.m3u"):
+        """Create a playlist file from the last generated JSON."""
+        json_path = os.path.join(self.output_dir, json_filename)
+        if not os.path.exists(json_path):
+            logging.warning(f"JSON file not found: {json_path}")
+            return None
+
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        out_path = os.path.join(self.output_dir, output_filename)
+        with open(out_path, 'w', encoding='utf-8') as f:
+            f.write('#EXTM3U\n')
+            for group, channels in data.get('channels', {}).items():
+                for channel in channels:
+                    name = channel.get('name', 'Unnamed Channel')
+                    logo = channel.get('logo', self.default_logo)
+                    url = channel.get('url')
+                    if url:
+                        f.write(f'#EXTINF:-1 tvg-logo="{logo}" group-title="{group}",{name}\n')
+                        f.write(f'{url}\n')
+
+        logging.info(f"Exported JSON-based M3U to {out_path}")
+        return out_path
+
     def export_txt(self, filename="LiveTV.txt"):
         filepath = os.path.join(self.output_dir, filename)
         with open(filepath, 'w', encoding='utf-8') as f:
@@ -219,20 +258,6 @@ class M3UCollector:
                     f.write("-" * 50 + "\n")
                 f.write("\n")
         logging.info(f"Exported TXT to {filepath}")
-        return filepath
-
-    def export_json(self, filename="LiveTV.json"):
-        filepath = os.path.join(self.output_dir, filename)
-        mumbai_tz = pytz.timezone('Asia/Kolkata')
-        current_time = datetime.now(mumbai_tz).strftime('%Y-%m-%d %H:%M:%S')
-        
-        json_data = {
-            "date": current_time,
-            "channels": dict(self.channels)
-        }
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(json_data, f, ensure_ascii=False, indent=2)
-        logging.info(f"Exported JSON to {filepath}")
         return filepath
 
     def export_custom(self, filename="LiveTV"):
@@ -271,8 +296,9 @@ def main():
     
     # Export files
     collector.export_m3u("LiveTV.m3u")
-    collector.export_txt("LiveTV.txt")
     collector.export_json("LiveTV.json")
+    collector.export_m3u_from_json("LiveTV.json", "lista.m3u")
+    collector.export_txt("LiveTV.txt")
     collector.export_custom("LiveTV")
     
     total_channels = sum(len(ch) for ch in collector.channels.values())
